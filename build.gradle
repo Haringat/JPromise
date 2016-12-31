@@ -79,9 +79,9 @@ uploadArchives {
 
                 developers {
                     developer {
-                        id "haringat"
+                        id "Haringat"
                         name "Marcel Mundl"
-                        email "marcel@mundlhome.de"
+                        email "Marcel@Mundlhome.de"
                     }
                 }
             }

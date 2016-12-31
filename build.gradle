@@ -1,0 +1,90 @@
+apply plugin: "java"
+apply plugin: "maven"
+apply plugin: "eclipse"
+apply plugin: "idea"
+apply plugin: "signing"
+
+repositories {
+    jcenter()
+}
+
+task javadocJar(type: Jar, dependsOn: javadoc) {
+    classifier = "javadoc"
+    from javadoc
+}
+
+task compile (type: JavaCompile)
+
+task apiJar(type: Jar) {
+    classifier = "api"
+    from fileTree(dir: "src/main/java").matching {
+        include "com/haringat/jpromise/api/**"
+    }
+}
+
+task sourcesJar(type: Jar) {
+    classifier = "sources"
+    from fileTree(dir: "src/main/java")
+}
+
+artifacts {
+    archives javadocJar, sourcesJar
+}
+
+signing {
+    sign configurations.archives
+}
+
+group = "com.github.haringat"
+archivesBaseName = "JPromise"
+version = "0.0.1"
+
+dependencies {
+    testCompile "junit:junit:4.12"
+    testCompile "org.assertj:assertj-core:3.5.2"
+}
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+                authentication(userName: ossrhUsername, password: ossrhPassword)
+            }
+
+            pom.project {
+                name "JPromise"
+                packaging "jar"
+                // optionally artifactId can be defined here
+                description "A simple A+ compatible promise library to make the usage of threads easier."
+                url "https://www.github.com/Haringat/JPromise"
+
+                scm {
+                    connection "scm:git:https://github.com/Haringat/JPromise"
+                    developerConnection "scm:git:https://github.com/Haringat/JPromise"
+                    url "https://github.com/Haringat/JPromise"
+                }
+
+                licenses {
+                    license {
+                        name "MIT License"
+                        url "http://opensource.org/licenses/MIT"
+                    }
+                }
+
+                developers {
+                    developer {
+                        id "haringat"
+                        name "Marcel Mundl"
+                        email "marcel@mundlhome.de"
+                    }
+                }
+            }
+        }
+    }
+}

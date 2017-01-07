@@ -28,7 +28,7 @@ task sourcesJar(type: Jar) {
 }
 
 artifacts {
-    archives javadocJar, sourcesJar
+    archives javadocJar, sourcesJar, apiJar
 }
 
 signing {
@@ -37,7 +37,7 @@ signing {
 
 group = "com.github.haringat"
 archivesBaseName = "JPromise"
-version = "0.0.1"
+version = "0.0.1-SNAPSHOT"
 
 dependencies {
     testCompile "junit:junit:4.12"
@@ -45,44 +45,43 @@ dependencies {
 }
 
 uploadArchives {
-    repositories {
-        mavenDeployer {
-            beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+    repositories.mavenDeployer {
+        beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
 
-            repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
+        repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+            authentication(userName: ossrhUsername, password: ossrhPassword)
+        }
+
+        snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+            authentication(userName: ossrhUsername, password: ossrhPassword)
+        }
+
+        pom.project {
+            name "JPromise"
+            packaging "jar"
+            // optionally artifactId can be defined here
+            description "A simple A+ compatible promise library to make the usage of threads easier."
+            url "https://www.github.com/Haringat/JPromise"
+
+            scm {
+                connection "scm:git:git://github.com/Haringat/JPromise.git"
+                developerConnection "scm:git:ssh://github.com:Haringat/JPromise.git"
+                url "https://github.com/Haringat/JPromise"
             }
 
-            snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-                authentication(userName: ossrhUsername, password: ossrhPassword)
+            licenses {
+                license {
+                    name "MIT License"
+                    url "http://opensource.org/licenses/MIT"
+                }
             }
 
-            pom.project {
-                name "JPromise"
-                packaging "jar"
-                // optionally artifactId can be defined here
-                description "A simple A+ compatible promise library to make the usage of threads easier."
-                url "https://www.github.com/Haringat/JPromise"
-
-                scm {
-                    connection "scm:git:https://github.com/Haringat/JPromise"
-                    developerConnection "scm:git:https://github.com/Haringat/JPromise"
-                    url "https://github.com/Haringat/JPromise"
-                }
-
-                licenses {
-                    license {
-                        name "MIT License"
-                        url "http://opensource.org/licenses/MIT"
-                    }
-                }
-
-                developers {
-                    developer {
-                        id "Haringat"
-                        name "Marcel Mundl"
-                        email "Marcel@Mundlhome.de"
-                    }
+            developers {
+                developer {
+                    id "Haringat"
+                    organizationUrl "https://github.com/Haringat"
+                    name "Marcel Mundl"
+                    email "Marcel@Mundlhome.de"
                 }
             }
         }

@@ -6,7 +6,9 @@ import com.github.haringat.jpromise.api.LockedException;
 import com.github.haringat.jpromise.api.callbacks.*;
 import com.github.haringat.jpromise.api.PromiseState;
 
+import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 public final class Promise<T> implements IPromise<T> {
@@ -25,50 +27,55 @@ public final class Promise<T> implements IPromise<T> {
         final Promise<T> _this = this;
         this.state = PromiseState.PENDING;
         this.taskThread = new Thread(() -> {
-            try {
-                deferredTask.process(new IStateManager<T>() {
-                    @Override
-                    public void resolve(T value) {
+            deferredTask.process(new IStateManager<T>() {
+                @Override
+                public void resolve(T value) {
+                    //noinspection SynchronizeOnNonFinalField
+                    synchronized (_this.state) {
                         if (_this.state != PromiseState.PENDING) {
                             throw new LockedException(_this.state, PromiseState.RESOLVED);
                         }
                         _this.state = PromiseState.RESOLVED;
                         _this.value = value;
-                        for (ISuccessCallback<T,?> listener: _this.resolveListeners) {
+                        for (ISuccessCallback<T, ?> listener : _this.resolveListeners) {
                             listener.proceed(value);
                         }
                     }
+                }
 
-                    @Override
-                    public void reject(Throwable cause) {
+                @Override
+                public void reject(Throwable cause) {
+                    //noinspection SynchronizeOnNonFinalField
+                    synchronized (_this.state) {
                         if (_this.state != PromiseState.PENDING) {
                             throw new LockedException(_this.state, PromiseState.REJECTED);
                         }
                         _this.state = PromiseState.REJECTED;
                         _this.cause = cause;
-                        for (IErrorCallback<T> listener: _this.rejectListeners) {
+                        for (IErrorCallback<T> listener : _this.rejectListeners) {
                             listener.handle(cause);
                         }
                     }
+                }
 
-                    @Override
-                    public void notify(double progress) {
+                @Override
+                public void notify(double progress) {
+                    //noinspection SynchronizeOnNonFinalField
+                    synchronized (_this.state) {
                         if (_this.state != PromiseState.PENDING) {
                             throw new LockedException(_this.state);
                         }
-                        for (IProgressCallback listener: _this.progressListeners) {
+                        for (IProgressCallback listener : _this.progressListeners) {
                             listener.onProgress(progress);
                         }
                     }
+                }
 
-                    @Override
-                    public void cancel() {
-                        _this.cancel();
-                    }
-                });
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-            }
+                @Override
+                public void cancel() {
+                    _this.cancel();
+                }
+            });
         });
         this.taskThread.start();
     }
@@ -187,10 +194,19 @@ public final class Promise<T> implements IPromise<T> {
     }
 
     @Override
-    public IPromise<T> cancel() {
-        this.state = PromiseState.CANCELLED;
-        this.taskThread.interrupt();
-        return this;
+    public IPromise<T> cancel() throws LockedException {
+        //noinspection SynchronizeOnNonFinalField
+        synchronized (this.state) {
+            if (this.state != PromiseState.PENDING) {
+                throw new LockedException(this.state, PromiseState.REJECTED);
+            }
+            this.state = PromiseState.REJECTED;
+            this.cancelled = true;
+            for(ICleanUpCallback listener: this.cancelListeners) {
+                listener.cleanup();
+            }
+            return this;
+        }
     }
 
     public T getValue() {
@@ -212,4 +228,55 @@ public final class Promise<T> implements IPromise<T> {
     public static <R> IPromise<R> reject(Throwable cause) {
         return new Promise<>(cause);
     }
+
+    public static <R> IPromise<List<R>> all(IPromise<R>[] promises) {
+        return new Promise<>(stateManager -> {
+            List<R> values = new ArrayList<>();
+            for (IPromise<R> promise: promises) {
+                promise.then(value -> {
+                    synchronized (values) {
+                        values.add(value);
+                        if (values.size() == promises.length) {
+                            stateManager.resolve(values);
+                        }
+                    }
+                    return Promise.resolve(value);
+                }, cause -> {
+                    stateManager.reject(cause);
+                    return Promise.reject(cause);
+                });
+            }
+        });
+    }
+
+    public static <R> IPromise<List<R>> all(Collection<IPromise<R>> promises) {
+        //noinspection unchecked
+        return Promise.all((IPromise<R>[]) promises.toArray());
+    }
+
+    public static <R> IPromise<R> race(IPromise<R>[] promises) {
+        return new Promise<>(stateManager -> {
+            for (IPromise<R> promise: promises) {
+                promise.then(value -> {
+                    //noinspection EmptyCatchBlock
+                    try {
+                        stateManager.resolve(value);
+                    } catch (LockedException e) {}
+                    return Promise.resolve(value);
+                }, cause -> {
+                    //noinspection EmptyCatchBlock
+                    try {
+                        stateManager.reject(cause);
+                    } catch (LockedException e) {}
+                    return Promise.reject(cause);
+                });
+            }
+        });
+    }
+
+    public static <R> IPromise<R> race(Collection<IPromise<R>> promises) {
+        //noinspection unchecked
+        return Promise.race((IPromise<R>[]) promises.toArray());
+    }
+
 }
